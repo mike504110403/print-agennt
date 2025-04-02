@@ -1,9 +1,9 @@
-name: Build and Release Print Agent
+name: Build Print Agent (macOS & Windows)
 
 on:
   push:
     tags:
-      - '*'
+      - 'v*.*.*'  # 僅在有版本 tag（如 v1.6.0）時觸發
 
 jobs:
   build:
@@ -13,21 +13,21 @@ jobs:
         os: [macos-latest, windows-latest]
 
     steps:
-      - name: Checkout code
+      - name: ⬇️ Checkout repository
         uses: actions/checkout@v3
 
-      - name: Setup Node
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: 18
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: npm install
 
-      - name: Make distributables
+      - name: 🛠 Build with electron-forge
         run: npm run make
 
-      - name: Upload build artifacts
+      - name: 📤 Upload Artifacts
         uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-build
@@ -36,27 +36,28 @@ jobs:
   release:
     needs: build
     runs-on: ubuntu-latest
+
     steps:
-      - name: Download macOS build
+      - name: ⬇️ Checkout repository
+        uses: actions/checkout@v3
+
+      - name: ⬇️ Download build artifacts (macOS)
         uses: actions/download-artifact@v3
         with:
           name: macos-latest-build
-          path: macos
+          path: artifacts/macos
 
-      - name: Download Windows build
+      - name: ⬇️ Download build artifacts (Windows)
         uses: actions/download-artifact@v3
         with:
           name: windows-latest-build
-          path: windows
+          path: artifacts/windows
 
-      - name: Create Release
+      - name: 🚀 Upload release to GitHub
         uses: softprops/action-gh-release@v1
         with:
-          name: Release ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
           files: |
-            macos/**/*.dmg
-            macos/**/*.zip
-            windows/**/*.exe
+            artifacts/macos/**
+            artifacts/windows/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
