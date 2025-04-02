@@ -2,36 +2,48 @@ name: Build Print Agent (macOS & Windows)
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build:
-    runs-on: macos-latest
-
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        platform: [mac, win]
-
+        os: [macos-latest, windows-latest]
     steps:
-      - name: Checkout source
+      - name: ⬇️ Checkout Repo
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: 🟢 Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: Install dependencies
-        run: |
-          npm install
+      - name: 📦 Install Dependencies
+        run: npm install
 
-      - name: Build (make)
-        run: |
-          npm run make
+      - name: 🛠️ Make Package
+        run: npm run make
 
-      - name: Upload build artifacts
+      - name: 🧪 檢查打包結果
+        run: |
+          echo "🔍 查看 out/make/"
+          ls -al out/make || echo "❌ 沒有找到打包資料夾"
+
+      - name: ☁️ Upload mac artifact
+        if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v3
         with:
-          name: build-${{ matrix.platform }}
-          path: out/make
+          name: print-agent-mac
+          path: |
+            out/make/**/print-agent*.dmg
+            out/make/**/print-agent*.zip
+
+      - name: ☁️ Upload win artifact
+        if: matrix.os == 'windows-latest'
+        uses: actions/upload-artifact@v3
+        with:
+          name: print-agent-win
+          path: |
+            out/make/**/print-agent*.exe
