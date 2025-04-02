@@ -2,17 +2,18 @@ name: Build Print Agent (macOS & Windows)
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
+
     steps:
-      - name: ⬇️ Checkout Repo
+      - name: 🧱 Checkout code
         uses: actions/checkout@v3
 
       - name: 🟢 Setup Node.js
@@ -20,30 +21,40 @@ jobs:
         with:
           node-version: 18
 
-      - name: 📦 Install Dependencies
+      - name: 📦 Install dependencies
         run: npm install
 
-      - name: 🛠️ Make Package
+      - name: 🔨 Build with Electron Forge
         run: npm run make
 
-      - name: 🧪 檢查打包結果
-        run: |
-          echo "🔍 查看 out/make/"
-          ls -al out/make || echo "❌ 沒有找到打包資料夾"
-
-      - name: ☁️ Upload mac artifact
-        if: matrix.os == 'macos-latest'
+      - name: 📁 Upload build artifacts
         uses: actions/upload-artifact@v3
         with:
-          name: print-agent-mac
+          name: print-agent-${{ matrix.os }}
           path: |
-            out/make/**/print-agent*.dmg
-            out/make/**/print-agent*.zip
+            out/make/**/*.dmg
+            out/make/**/*.zip
+            out/make/**/*.exe
 
-      - name: ☁️ Upload win artifact
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v3
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: 🧱 Checkout code
+        uses: actions/checkout@v3
+
+      - name: ⬇️ Download all artifacts
+        uses: actions/download-artifact@v3
         with:
-          name: print-agent-win
-          path: |
-            out/make/**/print-agent*.exe
+          path: artifacts
+
+      - name: 📦 Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v1.0.0
+          name: Print Agent v1.0.0
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
