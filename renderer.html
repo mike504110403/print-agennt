@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh">
+  <head>
+    <meta charset="UTF-8" />
+    <title>列印內容</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 2rem;
+        font-family: "Noto Sans TC", sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="content"></div>
+
+    <script>
+      const { ipcRenderer } = require("electron");
+
+      ipcRenderer.on("print-html", (event, html) => {
+        const container = document.getElementById("content");
+        container.innerHTML = html;
+
+        // 等內容渲染完畢後列印
+        setTimeout(() => {
+          window.print();
+
+          // 列印結束後通知主程序並關閉
+          window.onafterprint = () => {
+            ipcRenderer.send("printed");
+            window.close();
+          };
+
+          // 保險：5 秒後強制關閉
+          setTimeout(() => {
+            ipcRenderer.send("printed");
+            window.close();
+          }, 5000);
+        }, 300);
+      });
+    </script>
+  </body>
+</html>
