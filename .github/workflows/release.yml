@@ -1,69 +1,65 @@
-name: Build & Release Print Agent (macOS & Windows)
+name: Build Print Agent (macOS & Windows)
 
 on:
   push:
-    tags:
-      - 'v*.*.*'  # 例如 v1.0.0 時才會觸發
+    branches:
+      - main
 
 jobs:
   build:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build distributables
+        run: npm run make
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: print-agent-${{ matrix.os }}
+          path: out/make/**
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18
-
-      - name: Cache node modules
-        uses: actions/cache@v3
-        with:
-          path: ~/.npm
-          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-node-
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build Electron App
-        run: npm run make
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: print-agent-${{ matrix.os }}
-          path: out/make/**
-          
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download macOS artifact
-        uses: actions/download-artifact@v3
+      - name: Download mac artifact
+        uses: actions/download-artifact@v2
         with:
           name: print-agent-macos-latest
-          path: artifacts/macos
+          path: dist/macos
 
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v3
+      - name: Download win artifact
+        uses: actions/download-artifact@v2
         with:
           name: print-agent-windows-latest
-          path: artifacts/windows
+          path: dist/windows
 
-      - name: Create GitHub Release and Upload Assets
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          name: Release ${{ github.ref_name }}
-          tag_name: ${{ github.ref_name }}
+          tag_name: v1.0.${{ github.run_number }}
+          name: Print Agent v1.0.${{ github.run_number }}
           files: |
-            artifacts/macos/**
-            artifacts/windows/**
+            dist/macos/**
+            dist/windows/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
