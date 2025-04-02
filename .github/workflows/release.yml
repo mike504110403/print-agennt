@@ -2,64 +2,43 @@ name: Build Print Agent (macOS & Windows)
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+    tags:
+      - 'v*.*.*' # 只有有 tag 的時候才會上傳 release
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
 
+    runs-on: ${{ matrix.os }}
+
     steps:
-      - name: Checkout repository
+      - name: 🧾 Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Node.js
+      - name: 🧰 Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: 18
+          node-version: '18'
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: npm install
 
-      - name: Build distributables
+      - name: 🏗️ Make distributables
         run: npm run make
 
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v2
-        with:
-          name: print-agent-${{ matrix.os }}
-          path: out/make/**
+      - name: 📂 List artifacts
+        run: ls -R out/make
 
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      - name: Download mac artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: print-agent-macos-latest
-          path: dist/macos
-
-      - name: Download win artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: print-agent-windows-latest
-          path: dist/windows
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v1.0.${{ github.run_number }}
-          name: Print Agent v1.0.${{ github.run_number }}
-          files: |
-            dist/macos/**
-            dist/windows/**
+      - name: 📤 Upload Release (mac & win)
+        if: startsWith(github.ref, 'refs/tags/')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd out/make
+          for file in $(find . -type f); do
+            echo "📤 Uploading $file"
+            gh release upload "$GITHUB_REF_NAME" "$file" --repo "$GITHUB_REPOSITORY" --clobber
+          done
