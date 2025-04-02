@@ -1,60 +1,69 @@
-name: Build Print Agent (macOS & Windows)
+name: Build & Release Print Agent (macOS & Windows)
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*.*.*'  # 例如 v1.0.0 時才會觸發
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
-      - name: 🧱 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: 🟢 Setup Node.js
+      - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: 18
 
-      - name: 📦 Install dependencies
+      - name: Cache node modules
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
         run: npm install
 
-      - name: 🔨 Build with Electron Forge
+      - name: Build Electron App
         run: npm run make
 
-      - name: 📁 Upload build artifacts
+      - name: Upload artifacts
         uses: actions/upload-artifact@v3
         with:
           name: print-agent-${{ matrix.os }}
-          path: |
-            out/make/**/*.dmg
-            out/make/**/*.zip
-            out/make/**/*.exe
-
+          path: out/make/**
+          
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
     steps:
-      - name: 🧱 Checkout code
-        uses: actions/checkout@v3
-
-      - name: ⬇️ Download all artifacts
+      - name: Download macOS artifact
         uses: actions/download-artifact@v3
         with:
-          path: artifacts
+          name: print-agent-macos-latest
+          path: artifacts/macos
 
-      - name: 📦 Create GitHub Release
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: print-agent-windows-latest
+          path: artifacts/windows
+
+      - name: Create GitHub Release and Upload Assets
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v1.0.0
-          name: Print Agent v1.0.0
-          files: artifacts/**/*
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            artifacts/macos/**
+            artifacts/windows/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
