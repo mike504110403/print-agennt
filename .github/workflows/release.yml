@@ -1,44 +1,62 @@
-name: Build Print Agent (macOS & Windows)
+name: Build and Release Print Agent
 
 on:
   push:
-    branches: [main]
     tags:
-      - 'v*.*.*' # 只有有 tag 的時候才會上傳 release
+      - '*'
 
 jobs:
   build:
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [macos-latest, windows-latest]
 
-    runs-on: ${{ matrix.os }}
-
     steps:
-      - name: 🧾 Checkout code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: 🧰 Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: 📦 Install dependencies
+      - name: Install dependencies
         run: npm install
 
-      - name: 🏗️ Make distributables
+      - name: Make distributables
         run: npm run make
 
-      - name: 📂 List artifacts
-        run: ls -R out/make
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}-build
+          path: out/make/**
 
-      - name: 📤 Upload Release (mac & win)
-        if: startsWith(github.ref, 'refs/tags/')
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download macOS build
+        uses: actions/download-artifact@v3
+        with:
+          name: macos-latest-build
+          path: macos
+
+      - name: Download Windows build
+        uses: actions/download-artifact@v3
+        with:
+          name: windows-latest-build
+          path: windows
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            macos/**/*.dmg
+            macos/**/*.zip
+            windows/**/*.exe
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          cd out/make
-          for file in $(find . -type f); do
-            echo "📤 Uploading $file"
-            gh release upload "$GITHUB_REF_NAME" "$file" --repo "$GITHUB_REPOSITORY" --clobber
-          done
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
