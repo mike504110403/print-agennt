@@ -29,7 +29,7 @@ jobs:
         run: npm run make
 
       - name: 📤 Upload Artifacts
-        uses: actions/upload-artifact@v2  # 改成 v2 避免 v3 metadata 錯誤
+        uses: actions/upload-artifact@9c232e843ac0c2d2bcd7a86f7cb773146eb6e2be
         with:
           name: ${{ matrix.os }}-build
           path: out/make/**
