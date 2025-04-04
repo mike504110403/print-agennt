@@ -1,9 +1,11 @@
-name: Build Print Agent (macOS & Windows)
+name: Build & Release Print Agent (macOS & Windows)
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - 'v*.*.*'  # 例如 v1.6.0 時會觸發
+      - 'v*.*.*'
 
 jobs:
   build:
@@ -14,50 +16,51 @@ jobs:
 
     steps:
       - name: ⬇️ Checkout repository
-        uses: actions/checkout@a4f971c3dbb3f362ba025767ab2f2b1c8d40734e  # actions/checkout@v3
+        uses: actions/checkout@v3
 
       - name: 🟢 Setup Node.js
-        uses: actions/setup-node@c318714c6f1f5e3b8fa3a9b5be9292ba8da2fe2f  # actions/setup-node@v3
+        uses: actions/setup-node@v3
         with:
           node-version: 18
 
       - name: 📦 Install dependencies
         run: npm install
 
-      - name: 🛠 Build with electron-forge
+      - name: 🛠 Build executables
         run: npm run make
 
-      - name: 📤 Upload Artifacts
-        uses: actions/upload-artifact@9c7fdbe21c558d3954989fc42a7e56891b327b5f  # actions/upload-artifact@v3
+      - name: 📤 Upload build artifacts
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-build
-          path: out/make/**
+          path: out/make/
 
   release:
     needs: build
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
 
     steps:
       - name: ⬇️ Checkout repository
-        uses: actions/checkout@a4f971c3dbb3f362ba025767ab2f2b1c8d40734e
+        uses: actions/checkout@v3
 
-      - name: ⬇️ Download build artifacts (macOS)
-        uses: actions/download-artifact@fdcf8f849d53b8f5de8028b69f4f90f97e67cfb0
+      - name: ⬇️ Download macOS artifacts
+        uses: actions/download-artifact@v3
         with:
           name: macos-latest-build
-          path: artifacts/macos
+          path: dist/macos
 
-      - name: ⬇️ Download build artifacts (Windows)
-        uses: actions/download-artifact@fdcf8f849d53b8f5de8028b69f4f90f97e67cfb0
+      - name: ⬇️ Download Windows artifacts
+        uses: actions/download-artifact@v3
         with:
           name: windows-latest-build
-          path: artifacts/windows
+          path: dist/windows
 
-      - name: 🚀 Upload release to GitHub
+      - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/macos/**
-            artifacts/windows/**
+            dist/macos/**
+            dist/windows/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
