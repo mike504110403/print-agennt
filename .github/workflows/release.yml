@@ -1,9 +1,8 @@
-name: Build & Release Print Agent (macOS & Windows)
+name: Build Print Agent (macOS & Windows)
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
     tags:
       - 'v*.*.*'
 
@@ -26,41 +25,41 @@ jobs:
       - name: 📦 Install dependencies
         run: npm install
 
-      - name: 🛠 Build executables
+      - name: 🛠 Build with electron-forge
         run: npm run make
 
-      - name: 📤 Upload build artifacts
-        uses: actions/upload-artifact@v3
+      - name: 📤 Upload Artifacts
+        uses: actions/upload-artifact@v2  # 改成 v2 避免 v3 metadata 錯誤
         with:
           name: ${{ matrix.os }}-build
-          path: out/make/
+          path: out/make/**
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+    if: startsWith(github.ref, 'refs/tags/')
 
     steps:
       - name: ⬇️ Checkout repository
         uses: actions/checkout@v3
 
-      - name: ⬇️ Download macOS artifacts
+      - name: ⬇️ Download macOS build
         uses: actions/download-artifact@v3
         with:
           name: macos-latest-build
-          path: dist/macos
+          path: artifacts/macos
 
-      - name: ⬇️ Download Windows artifacts
+      - name: ⬇️ Download Windows build
         uses: actions/download-artifact@v3
         with:
           name: windows-latest-build
-          path: dist/windows
+          path: artifacts/windows
 
-      - name: 🚀 Create GitHub Release
+      - name: 🚀 Upload GitHub release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/macos/**
-            dist/windows/**
+            artifacts/macos/**
+            artifacts/windows/**
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
