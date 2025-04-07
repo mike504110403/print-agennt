@@ -1,9 +1,7 @@
 {
-  "websocketURL": "ws://127.0.0.1:3000/ws/print",
+  "websocketURL": "ws://13.208.243.217/ws/print",
   "saved": [
-    "ws://localhost:8080",
-    "ws://localhost:3000/ws/print",
     "ws://127.0.0.1:3000/ws/print",
-    "ws://127.0.0.1/ws/print"
+    "ws://13.208.243.217/ws/print"
   ]
 }
