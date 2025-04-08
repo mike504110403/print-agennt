@@ -1,8 +1,9 @@
-// main.js
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const WebSocket = require("ws");
 const fs = require("fs");
+
+app.setPath("userData", path.join(__dirname, "user_data"));
 
 let mainWindow;
 let settingsWindow;
@@ -11,6 +12,7 @@ let ws = null;
 let wsURL = "";
 let savedConfigs = [];
 const configPath = path.join(__dirname, "config.json");
+const logPath = path.join(__dirname, "print-log.txt");
 
 function loadConfig() {
   try {
@@ -18,9 +20,9 @@ function loadConfig() {
     const config = JSON.parse(data);
     wsURL = config.websocketURL || "";
     savedConfigs = config.saved || [];
-    console.log("🔧 已載入設定:", wsURL);
+    console.log("[Config] Loaded:", wsURL);
   } catch (err) {
-    console.log("⚠️ 無法讀取設定，請從畫面設定 WebSocket URL");
+    console.log("[Config] Failed to read config.");
   }
 }
 
@@ -34,10 +36,17 @@ function saveConfig(url) {
       configPath,
       JSON.stringify({ websocketURL: url, saved: savedConfigs }, null, 2)
     );
-    console.log("✅ 已儲存設定:", url);
+    console.log("[Config] Saved:", url);
   } catch (err) {
-    console.error("❌ 儲存設定失敗:", err.message);
+    console.error("[Config] Save failed:", err.message);
   }
+}
+
+function logPrintEvent(status, detail = "") {
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] ${status}${detail ? " - " + detail : ""}\n`;
+  fs.appendFileSync(logPath, logEntry);
+  console.log("[Log]", logEntry.trim());
 }
 
 function createMainWindow() {
@@ -77,11 +86,8 @@ function setupWebSocket(url) {
 
   if (ws) {
     ws.removeAllListeners();
-    if (
-      ws.readyState === WebSocket.OPEN ||
-      ws.readyState === WebSocket.CLOSING
-    ) {
-      ws.terminate(); // ✅ 安全終止連線
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CLOSING) {
+      ws.terminate();
     }
     ws = null;
   }
@@ -89,7 +95,7 @@ function setupWebSocket(url) {
   ws = new WebSocket(url);
 
   ws.on("open", () => {
-    console.log("✅ 已連接 WebSocket:", url);
+    console.log("[WebSocket] Connected:", url);
     settingsWindow.webContents.send("ws-status", {
       status: "connected",
       url,
@@ -97,32 +103,45 @@ function setupWebSocket(url) {
   });
 
   ws.on("message", async (data) => {
-    console.log("📩 收到 HTML 資料，準備列印");
+    console.log("[Print] HTML received, opening window...");
 
     const html = data.toString();
+
+    // ✅ 在 </body> 前插入 window.print() 觸發列印
+    const htmlWithPrint = html.replace(
+      /<\/body>/i,
+      `<script>
+        window.onload = () => {
+          setTimeout(() => window.print(), 500);
+        };
+      </script></body>`
+    );
+
     const tempPath = path.join(app.getPath("temp"), `print_${Date.now()}.html`);
-    fs.writeFileSync(tempPath, html, "utf8");
+    fs.writeFileSync(tempPath, htmlWithPrint, "utf8");
 
     const printWindow = new BrowserWindow({
-      show: false,
+      width: 800,
+      height: 1000,
+      show: true,
+      frame: true,
       webPreferences: {
         sandbox: false,
+        contextIsolation: false,
+        nodeIntegration: false,
       },
     });
 
     await printWindow.loadFile(tempPath);
-    printWindow.webContents.on("did-finish-load", () => {
-      printWindow.webContents.print({ silent: true }, (success, errorType) => {
-        if (!success) {
-          console.error("列印錯誤:", errorType);
-        }
-        printWindow.close();
-      });
-    });
+
+    // log 記錄
+    logPrintEvent("📄 已開啟列印預覽", tempPath);
+
+    // 使用者自行選擇列印或取消，我們不強制關閉
   });
 
   ws.on("close", () => {
-    console.log("⚠️ WebSocket 已關閉，5 秒後重試...");
+    console.log("[WebSocket] Disconnected. Reconnecting in 5s...");
     settingsWindow.webContents.send("ws-status", {
       status: "disconnected",
       url,
@@ -131,7 +150,7 @@ function setupWebSocket(url) {
   });
 
   ws.on("error", (err) => {
-    console.error("❌ WebSocket 錯誤:", err.message);
+    console.error("[WebSocket] Error:", err.message);
     settingsWindow.webContents.send("ws-status", {
       status: "error",
       url,
@@ -140,9 +159,9 @@ function setupWebSocket(url) {
   });
 }
 
-// ========== IPC 操作 ==========
+// ========== IPC ==========
 ipcMain.on("printed", () => {
-  console.log("🖨️ 已完成列印");
+  logPrintEvent("🖨️ 列印完成");
 });
 
 ipcMain.on("ws-url", (event, url) => {
@@ -169,7 +188,7 @@ ipcMain.on("get-current-status", () => {
   });
 });
 
-// ========== 啟動應用 ==========
+// 啟動
 app.whenReady().then(() => {
   loadConfig();
   createMainWindow();

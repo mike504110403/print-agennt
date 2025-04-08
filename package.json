@@ -11,7 +11,8 @@
     "package": "electron-forge package"
   },
   "dependencies": {
-    "ws": "^8.18.1"
+    "ws": "^8.18.1",
+    "yarn": "^1.22.22"
   },
   "devDependencies": {
     "@electron-forge/cli": "^6.0.0-beta.61",
